@@ -1,4 +1,4 @@
-// Downstream Service: Validates Vault token before serving requests
+// Downstream Service: Validates Vault token with caching for offline validation
 const http = require('http');
 const fs = require('fs');
 
@@ -13,8 +13,23 @@ const env = fs.readFileSync('.env', 'utf8')
 
 const VAULT_ADDR = env.VAULT_ADDR;
 
-// Validate token with Vault
+// Token cache: token -> { data, expiresAt }
+const tokenCache = new Map();
+
+// Validate token with Vault (with caching)
 async function validateToken(token) {
+  // Check cache first
+  const cached = tokenCache.get(token);
+  if (cached) {
+    if (Date.now() < cached.expiresAt) {
+      console.log('   (using cached token info)');
+      return cached.data;
+    }
+    // Expired, remove from cache
+    tokenCache.delete(token);
+  }
+
+  // Call Vault to validate
   return new Promise((resolve, reject) => {
     const urlObj = new URL(`${VAULT_ADDR}/v1/auth/token/lookup-self`);
     const req = http.request({
@@ -28,7 +43,14 @@ async function validateToken(token) {
       res.on('data', chunk => data += chunk);
       res.on('end', () => {
         if (res.statusCode === 200) {
-          resolve(JSON.parse(data));
+          const parsed = JSON.parse(data);
+          // Cache the token info until it expires (use TTL from Vault)
+          const ttlSeconds = parsed.data.ttl || 300;
+          tokenCache.set(token, {
+            data: parsed,
+            expiresAt: Date.now() + (ttlSeconds * 1000)
+          });
+          resolve(parsed);
         } else {
           resolve(null);
         }
