@@ -4,7 +4,7 @@
 SET SERVEROUTPUT ON SIZE UNLIMITED
 SET DEFINE OFF
 
-@03-run-upstream.sql
+@02-upstream-service.sql
 
 -- Execute the procedure
 EXEC upstream_service_call;
