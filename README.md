@@ -2,7 +2,21 @@
 
 Minimal demo showing AppRole authentication with HashiCorp Vault.
 
+## Files
+
+| File | Purpose |
+|------|---------|
+| `setup-vault.sh` | Configures Vault: enables AppRole, creates policy & role, outputs credentials to `.env` |
+| `upstream-service.js` | Logs in with AppRole, gets token, calls downstream with `X-Vault-Token` header |
+| `downstream-service.js` | Validates the token with Vault before serving protected data |
+
 ## Flow
+
+1. **Upstream service** logs in to Vault using AppRole (`role_id` + `secret_id`)
+2. **Vault** returns a client token
+3. **Upstream** calls downstream with `X-Vault-Token: <token>` header
+4. **Downstream** validates the token by calling Vault's `/v1/auth/token/lookup-self`
+5. If valid, downstream serves the protected data
 
 ```
 ┌─────────────────┐     1. AppRole Login       ┌─────────────┐
