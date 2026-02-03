@@ -7,8 +7,10 @@ Minimal demo showing AppRole authentication with HashiCorp Vault.
 | File | Purpose |
 |------|---------|
 | `setup-vault.sh` | Configures Vault: enables AppRole, creates policy & role, outputs credentials to `.env` |
-| `upstream-service.js` | Logs in with AppRole, gets token, calls downstream with `X-Vault-Token` header |
-| `downstream-service.js` | Validates the token with Vault before serving protected data |
+| `upstream-service.sql` | PL/SQL: Logs in with AppRole, gets token, calls downstream with `X-Vault-Token` header |
+| `setup-oracle-acl.sql` | Grants Oracle network ACL permissions (run as SYS) |
+| `run-upstream.sql` | Helper script to run the PL/SQL upstream service |
+| `downstream-service.js` | Node.js: Validates the token with Vault before serving protected data |
 
 ## Flow
 
@@ -55,16 +57,22 @@ chmod +x setup-vault.sh
 node downstream-service.js
 ```
 
-### 4. Run upstream service
+### 4. Setup Oracle ACL (one-time, as SYS)
 ```bash
-node upstream-service.js
+sqlplus sys/your_password@//localhost:1521/ORCLPDB1 as sysdba @setup-oracle-acl.sql
+```
+
+### 5. Run upstream service (PL/SQL)
+```bash
+# Get ROLE_ID and SECRET_ID from .env file, then:
+sqlplus owner/owner_pwd@//localhost:1521/ORCLPDB1 @run-upstream.sql
 ```
 
 ## Expected Output
 
-**Upstream service:**
+**Upstream service (PL/SQL):**
 ```
-=== Upstream Service ===
+=== Upstream Service (PL/SQL) ===
 
 1. Logging in to Vault with AppRole...
    Got Vault token: hvs.CAESI...

@@ -48,7 +48,7 @@ async function main() {
 
   const loginData = JSON.parse(loginRes.body);
   const vaultToken = loginData.auth.client_token;
-  console.log(`   Got Vault token: ${vaultToken.substring(0, 10)}...`);
+  console.log(`   Got Vault token: ${vaultToken}`);
 
   // Step 2: Call downstream service with token in header
   console.log('\n2. Calling downstream service with X-Vault-Token header...');
