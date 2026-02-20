@@ -12,6 +12,7 @@ const env = fs.readFileSync('.env', 'utf8')
   }, {});
 
 const VAULT_ADDR = env.VAULT_ADDR;
+const VAULT_NAMESPACE = env.VAULT_NAMESPACE;
 
 // Validate token with Vault
 async function validateToken(token) {
@@ -22,7 +23,7 @@ async function validateToken(token) {
       port: urlObj.port,
       path: urlObj.pathname,
       method: 'GET',
-      headers: { 'X-Vault-Token': token }
+      headers: { 'X-Vault-Token': token, 'X-Vault-Namespace': VAULT_NAMESPACE }
     }, res => {
       let data = '';
       res.on('data', chunk => data += chunk);

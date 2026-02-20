@@ -1,4 +1,4 @@
-// Upstream Service: Logs in with AppRole, gets token, calls downstream service
+// Upstream Service: Creates a child token via token role, calls downstream service
 const http = require('http');
 const fs = require('fs');
 
@@ -12,8 +12,8 @@ const env = fs.readFileSync('.env', 'utf8')
   }, {});
 
 const VAULT_ADDR = env.VAULT_ADDR;
-const ROLE_ID = env.ROLE_ID;
-const SECRET_ID = env.SECRET_ID;
+const VAULT_TOKEN = env.VAULT_TOKEN;
+const VAULT_NAMESPACE = env.VAULT_NAMESPACE;
 
 // Simple HTTP request helper
 function request(url, options, body) {
@@ -39,22 +39,44 @@ function request(url, options, body) {
 async function main() {
   console.log('=== Upstream Service ===\n');
 
-  // Step 1: Login to Vault with AppRole
-  console.log('1. Logging in to Vault with AppRole...');
-  const loginRes = await request(`${VAULT_ADDR}/v1/auth/approle/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' }
-  }, JSON.stringify({ role_id: ROLE_ID, secret_id: SECRET_ID }));
+  if (!VAULT_TOKEN || !VAULT_NAMESPACE) {
+    console.error('Error: VAULT_TOKEN and VAULT_NAMESPACE must be set in .env');
+    process.exit(1);
+  }
 
-  const loginData = JSON.parse(loginRes.body);
-  const vaultToken = loginData.auth.client_token;
-  console.log(`   Got Vault token: ${vaultToken.substring(0, 10)}...`);
+  console.log(`1. Using parent token from .env: ${VAULT_TOKEN.substring(0, 10)}...`);
 
-  // Step 2: Call downstream service with token in header
-  console.log('\n2. Calling downstream service with X-Vault-Token header...');
+  // Create a child token scoped to the "my-service" token role
+  console.log('\n2. Creating child token via token role "my-service"...');
+  const createRes = await request(
+    `${VAULT_ADDR}/v1/auth/token/create/my-service`,
+    {
+      method: 'POST',
+      headers: {
+        'X-Vault-Token': VAULT_TOKEN,
+        'X-Vault-Namespace': VAULT_NAMESPACE,
+        'Content-Type': 'application/json'
+      }
+    },
+    JSON.stringify({})
+  );
+
+  if (createRes.status !== 200) {
+    console.error(`   Error creating child token: ${createRes.status}`);
+    console.error(`   ${createRes.body}`);
+    process.exit(1);
+  }
+
+  const tokenData = JSON.parse(createRes.body);
+  const childToken = tokenData.auth.client_token;
+  console.log(`   Got child token: ${childToken.substring(0, 10)}...`);
+  console.log(`   Policies: ${tokenData.auth.policies.join(', ')}`);
+
+  // Call downstream service with the CHILD token (not the parent)
+  console.log('\n3. Calling downstream service with child token...');
   const downstreamRes = await request('http://127.0.0.1:3001/api/data', {
     method: 'GET',
-    headers: { 'X-Vault-Token': vaultToken }
+    headers: { 'X-Vault-Token': childToken }
   });
 
   console.log(`   Response status: ${downstreamRes.status}`);

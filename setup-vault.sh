@@ -1,47 +1,43 @@
 #!/bin/bash
-# Setup script for Vault AppRole auth
-# Assumes: vault server -dev is running with VAULT_ADDR=http://127.0.0.1:8200
+# Setup script for Vault token-role auth
+# Requires: VAULT_ADDR, VAULT_TOKEN, and VAULT_NAMESPACE to be set
 
-export VAULT_ADDR="http://127.0.0.1:8200"
-export VAULT_TOKEN="root"
+if [ -z "$VAULT_ADDR" ] || [ -z "$VAULT_TOKEN" ] || [ -z "$VAULT_NAMESPACE" ]; then
+  echo "Error: VAULT_ADDR, VAULT_TOKEN, and VAULT_NAMESPACE must be set"
+  echo "Example:"
+  echo "  export VAULT_ADDR=https://vault.example.com"
+  echo "  export VAULT_TOKEN=root"
+  echo "  export VAULT_NAMESPACE=my-namespace"
+  exit 1
+fi
 
-echo "=== Setting up Vault AppRole ==="
-
-# Enable AppRole auth method
-vault auth enable approle 2>/dev/null || echo "AppRole already enabled"
+echo "=== Setting up Vault Token Role ==="
+echo "Namespace: $VAULT_NAMESPACE"
 
 # Create a policy that allows reading secrets
-vault policy write my-service-policy - <<EOF
+vault policy write -namespace="$VAULT_NAMESPACE" my-service-policy - <<EOF
 path "secret/data/myapp/*" {
   capabilities = ["read"]
 }
 EOF
 
-# Create an AppRole role
-vault write auth/approle/role/my-service \
-    token_policies="my-service-policy" \
+# Create a token role (upstream will create child tokens via this role)
+vault write -namespace="$VAULT_NAMESPACE" auth/token/roles/my-service \
+    allowed_policies="my-service-policy" \
     token_ttl=1h \
     token_max_ttl=4h
 
-# Get role-id and secret-id
-ROLE_ID=$(vault read -field=role_id auth/approle/role/my-service/role-id)
-SECRET_ID=$(vault write -field=secret_id -f auth/approle/role/my-service/secret-id)
-
 echo ""
-echo "=== Credentials (save these!) ==="
-echo "ROLE_ID=$ROLE_ID"
-echo "SECRET_ID=$SECRET_ID"
-
-# Write to .env file for the demo
-cat > .env <<EOF
-VAULT_ADDR=http://127.0.0.1:8200
-ROLE_ID=$ROLE_ID
-SECRET_ID=$SECRET_ID
-EOF
-
+echo "=== Setup Complete ==="
+echo "Token role 'my-service' created with policy 'my-service-policy'"
 echo ""
-echo "Credentials saved to .env"
+echo "Next steps:"
+echo "  1. Get a token from the Vault UI"
+echo "  2. Update .env with VAULT_TOKEN, VAULT_NAMESPACE, and VAULT_ADDR"
+echo "  3. Start downstream: node downstream-service.js"
+echo "  4. Run upstream:   node upstream-service.js"
 
 # Create a test secret
-vault kv put secret/myapp/config message="Hello from Vault!"
+vault kv put -namespace="$VAULT_NAMESPACE" secret/myapp/config message="Hello from Vault!"
+echo ""
 echo "Test secret created at secret/myapp/config"
