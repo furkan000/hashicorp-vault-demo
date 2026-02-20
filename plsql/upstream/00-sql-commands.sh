@@ -1,5 +1,6 @@
 docker volume create oracle-oradata
-docker run -d --name oracle-db -p 1521:1521 --network=host container-registry.oracle.com/database/enterprise:latest
+# docker run -d --name oracle-db -p 1521:1521 --network=host container-registry.oracle.com/database/enterprise:latest
+docker run -d --name oracle-db -p 1521:1521 --network=host container-registry.oracle.com/database/enterprise:19.19.0.0
 
 docker logs -f oracle-db
 

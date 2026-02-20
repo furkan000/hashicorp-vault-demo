@@ -1,5 +1,6 @@
 #!/bin/bash
 # Setup script for Vault AppRole auth
+# vault server -dev -dev-root-token-id="root"
 # Assumes: vault server -dev is running with VAULT_ADDR=http://127.0.0.1:8200
 
 export VAULT_ADDR="http://127.0.0.1:8200"
